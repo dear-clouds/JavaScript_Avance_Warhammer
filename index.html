@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Warhammer</title>
+    <script src="js/phaser.min.js"></script>
+    <style>
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    canvas {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+    }
+    </style>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+    window.onload = function() {
+
+        var game = new Phaser.Game(1920, 1080, Phaser.CANVAS, '', { preload: preload, create: create, update: update, render: render });
+
+
+        function preload () {
+
+            game.load.image('galaxy', 'assets/galaxy2.jpg');
+            game.load.image('ship', 'assets/ship.png');
+            game.load.image('ship2', 'assets/F5S4.png');
+            game.load.image('ship3', 'assets/fighters.png');
+            game.load.spritesheet('explosion', 'assets/explosion.png', 100, 100);
+            game.load.image('bullet', 'assets/bullet.png', 40, 32);
+            game.load.image('asteroid', 'assets/asteroid.png');
+            game.load.image('baddie', 'assets/baddie.png');
+            game.load.audio('explosionSound', 'assets/explosion.wav');
+            game.load.audio('laserSound', 'assets/laser.wav');
+
+        }
+
+        // Déclaration de toutes les variables
+
+        var player;
+        var galaxy;
+        var cursors;
+        var fireButton;
+        var explosions;
+        var bullets;
+        var bullet;
+        var bulletTime = 0;
+        var firingTimer = 0;
+        var s;
+        var i;
+        var asteroids;
+        var asteriod;
+        var selected;
+        var ship2;
+        var ship3;
+
+
+
+        function create() {
+
+            game.physics.startSystem(Phaser.Physics.ARCADE);
+            game.world.setBounds(0, 0, 3000, 2000);
+
+            galaxy = game.add.tileSprite(0, 0, 3000, 2000, 'galaxy');
+
+            // Ship 1
+            player = game.add.sprite(0, game.world.height - 0, 'ship');
+            player.game.physics.arcade.enableBody(player);
+            game.physics.enable(player, Phaser.Physics.ARCADE);
+            player.inputEnabled = true;
+            player.events.onInputDown.add(selector, this);
+            player.body.collideWorldBounds = true;
+            player.anchor.setTo(20, 4);
+
+            // Ship 2
+            ship2 = game.add.sprite(0, game.world.height - 0, 'ship2');
+            ship2.game.physics.arcade.enableBody(ship2);
+            game.physics.enable(ship2, Phaser.Physics.ARCADE);
+            ship2.inputEnabled = true;
+            ship2.events.onInputDown.add(selector, this);
+            ship2.body.collideWorldBounds = true;
+            ship2.anchor.setTo(30, 0);
+
+            // Ship 3
+            ship3 = game.add.sprite(0, game.world.height - 0, 'ship3');
+            ship3.game.physics.arcade.enableBody(ship3);
+            game.physics.enable(ship3, Phaser.Physics.ARCADE);
+            ship3.inputEnabled = true;
+            ship3.events.onInputDown.add(selector, this);
+            ship3.body.collideWorldBounds = true;
+            ship3.anchor.setTo(0, 3);
+
+            // Lasers
+            bullets = game.add.group();
+            bullets.enableBody = true;
+            bullets.physicsBodyType = Phaser.Physics.ARCADE;
+            bullets.createMultiple(30, 'bullet');
+            bullets.setAll('anchor.x', 65.68);
+            bullets.setAll('anchor.y', 15.7);
+            bullets.setAll('outOfBoundsKill', true);
+            bullets.setAll('checkWorldBounds', true);
+
+            // Lasers des ennemis
+            enemyBullets = game.add.group();
+            enemyBullets.enableBody = true;
+            enemyBullets.physicsBodyType = Phaser.Physics.ARCADE;
+            enemyBullets.createMultiple(30, 'bullet');
+            enemyBullets.setAll('anchor.x', 0.5);
+            enemyBullets.setAll('anchor.y', 1);
+            enemyBullets.setAll('outOfBoundsKill', true);
+            enemyBullets.setAll('checkWorldBounds', true);
+
+            // Touches de contrôle
+            cursors = game.input.keyboard.createCursorKeys();
+            fireButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+            // Génération des astéroids
+            generateAsteriods();
+
+            // Position caméra par défaut
+            game.camera.x = 0;
+            game.camera.y = 2000;
+
+            // Explosion
+            explosions = game.add.group();
+            explosions.createMultiple(20, 'explosion');
+            explosions.forEach(setupPlayer, this);
+
+            // Sons
+            explosionSound = this.add.audio('explosionSound');
+            laserSound = this.add.audio('laserSound');
+
+            // Selection ships, valeur par défaut
+            selector(player);
+
+        }
+
+        
+
+        function update() {
+
+            galaxy.tilePosition.y += 2;
+            selected.body.velocity.x = 0;
+            selected.body.velocity.y = 0;
+
+            // asteroids.angle += 1;
+
+            // Mouvement ship
+            if (cursors.left.isDown)
+            {
+                selected.body.velocity.x = -100;
+            }
+            else if (cursors.right.isDown)
+            {
+                selected.body.velocity.x = 100;
+
+            }
+
+            else if (cursors.up.isDown)
+            {
+                selected.body.velocity.y = -100;
+            }
+
+
+            else if (cursors.down.isDown)
+            {
+                selected.body.velocity.y = 100;
+            }
+
+            else if (fireButton.isDown)
+            {
+                fireBullet();
+                laserSound.play();
+            }
+
+            // Caméra
+            if (game.input.keyboard.isDown(Phaser.Keyboard.Z))
+            {
+                game.camera.y -= 5;
+            }
+            else if (game.input.keyboard.isDown(Phaser.Keyboard.Q))
+            {
+                game.camera.x -= 5;
+            }
+
+            if (game.input.keyboard.isDown(Phaser.Keyboard.D))
+            {
+                game.camera.x += 5;
+            }
+            else if (game.input.keyboard.isDown(Phaser.Keyboard.S))
+            {
+                game.camera.y += 5;
+            }
+
+
+            else
+            {
+                selected.animations.stop();
+
+                selected.frame = 4;
+            }
+
+            // Colisions
+            game.physics.arcade.overlap(selected, asteroids, hitAsteroid, null, this);
+            // game.physics.arcade.overlap(enemyBullets, selected, enemyHitsselected, null, this);
+
+        }
+
+        function generateAsteriods() {
+            asteroids = game.add.group();
+
+            asteroids.enableBody = true;
+            asteroids.physicsBodyType = Phaser.Physics.ARCADE;
+
+            var numAsteroids = game.rnd.integerInRange(8, 20)
+
+            for (var i = 0; i < numAsteroids; i++) {
+              asteriod = asteroids.create(game.world.randomX, game.world.randomY, 'asteroid');
+              asteriod.scale.setTo(game.rnd.integerInRange(4, 20)/20);
+
+              asteriod.body.velocity.x = game.rnd.integerInRange(-20, 20);
+              asteriod.body.velocity.y = game.rnd.integerInRange(-20, 20);
+              asteriod.body.immovable = true;
+              asteriod.angle = game.rnd.integerInRange(-100, 100);
+              asteriod.body.collideWorldBounds = false;
+
+          }
+      }
+
+      function selector(ship) {
+        selected = ship;
+    }
+
+    function hitAsteroid(selected, asteroid) {
+        explosionSound.play();
+
+        selected.kill();
+
+        var explosion = explosions.getFirstExists(false);
+        explosion.reset(selected.body.x, selected.body.y);
+        explosion.play('explosion', 30, false, true);
+
+        // game.time.events.add(800, gameOver, this);
+    }
+
+
+    function fireBullet () {
+        bullet = bullets.getFirstExists(false);
+
+        if (bullet)
+        {
+            bullet.reset(selected.x, selected.y + 8);
+            bullet.body.velocity.y = -2000;
+            bullet.body.velocity.x = 0;
+            bulletTime = game.time.now + 200;
+        }
+
+
+    }
+    function resetBullet (bullet) {
+        bullet.kill();
+    }
+
+
+
+    function setupPlayer (selected) {
+
+        // selected.anchor.x = 0;
+        // selected.anchor.y = 0;
+        selected.animations.add('explosion');
+
+    }
+
+
+
+    function render() {
+
+        game.debug.cameraInfo(game.camera, 32, 32);
+        game.debug.spriteInfo(player, 350, 32);
+        game.debug.spriteInfo(ship2, 700, 32);
+        game.debug.spriteInfo(ship3, 1030, 32);
+
+    }
+
+};
+
+</script>
+
+</body>
+</html>
